@@ -4,7 +4,7 @@ import cs455.overlay.transport.TCPConnection;
 
 /**
  * Only exists for testing purposes
- * @author brandt
+ * @author Brandt Reutimann
  *
  */
 public class DefaultEvent implements Event {

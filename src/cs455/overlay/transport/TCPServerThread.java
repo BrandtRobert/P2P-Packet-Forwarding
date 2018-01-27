@@ -79,7 +79,6 @@ public class TCPServerThread implements Runnable {
 	public void closeConnection(TCPConnection tconn) {
 		int index = activeConnections.getConnectionIndexByID(tconn.getID());
 		if (index != -1) {
-			TCPConnection c = activeConnections.get(index);
 			activeConnections.remove(index);
 		}
 		tconn.close();

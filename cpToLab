@@ -1,0 +1,5 @@
+#!/bin/bash
+tar -cvf overlay.tar *
+scp overlay.tar brandtr@olympia.cs.colostate.edu:~/cs455/Overlay/
+ssh brandtr@olympia.cs.colostate.edu 'cd ~/cs455/Overlay/ && tar -xvf overlay.tar && rm overlay.tar'
+rm overlay.tar

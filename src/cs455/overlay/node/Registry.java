@@ -80,12 +80,14 @@ public class Registry implements Node {
 				responseStr = e.getMessage();
 			}
 		}
-System.out.println("Registration msg: " + responseStr);
 		// Craft the response message
 		RegistryReportsRegistrationStatus response = 
 				new RegistryReportsRegistrationStatus(registeredId, responseStr);
 		// Send the response message back to the client
 		event.getResponseConnection().sendMessage(response.getBytes());
+		/**
+		 * @TODO handle scenario where node dies right after registration
+		 */
 		return registeredId;
 	}
 	
