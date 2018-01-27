@@ -56,4 +56,12 @@ public class RoutingTable {
 	public int size() {
 		return routingtable.size();
 	}
+	
+	public void printManifest () {
+		for (Map.Entry<Integer, RoutingTableEntry> r : routingtable.entrySet()) {
+			int key = r.getKey();
+			RoutingTableEntry entry = r.getValue();
+			System.out.println("Entry id: " + key + ", IP: " + entry.getIp() + ", Port: " + entry.getPort());
+		}
+	}
 }

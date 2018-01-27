@@ -1,7 +1,6 @@
 package cs455.overlay.wireframes;
 
 import cs455.overlay.transport.TCPConnection;
-import sun.applet.resources.MsgAppletViewer_pt_BR;
 
 /**
  * Only exists for testing purposes

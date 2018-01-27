@@ -11,7 +11,7 @@ public class EventFactory {
 		byte msgType = msg[0];
 		if (msgType == Protocol.OVERLAY_NODE_SENDS_REGISTRATION.getValue()) {
 			return new OverlayNodeSendsRegistration(msg, incomingConnection);
-		} else if (msgType == Protocol.OVERLAY_NODE_SENDS_REGISTRATION.getValue()) {
+		} else if (msgType == Protocol.REGISTRY_REPORTS_REGISTRATION_STATUS.getValue()) {
 			return new RegistryReportsRegistrationStatus(msg, incomingConnection);
 		} else {
 			return null;

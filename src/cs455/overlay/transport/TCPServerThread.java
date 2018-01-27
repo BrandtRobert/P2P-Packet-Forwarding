@@ -78,14 +78,20 @@ public class TCPServerThread implements Runnable {
 	
 	public void closeConnection(TCPConnection tconn) {
 		int index = activeConnections.getConnectionIndexByID(tconn.getID());
-		TCPConnection c = activeConnections.get(index);
-		activeConnections.remove(index);
-		c.close();
+		if (index != -1) {
+			TCPConnection c = activeConnections.get(index);
+			activeConnections.remove(index);
+		}
+		tconn.close();
 		return;
 	}
 	
 	public void onEvent (Event e) {
 		master.onEvent(e);
+	}
+	
+	public synchronized void addConnectionToCache (TCPConnection tconn) {
+		activeConnections.add(tconn);
 	}
 	
 }

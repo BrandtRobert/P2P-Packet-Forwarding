@@ -33,6 +33,9 @@ public class Registry implements Node {
 				System.out.println("System Exiting...");
 				System.exit(0);
 			}
+			if (input.equals("list-messaging-nodes")) {
+				registry.routingTable.printManifest();
+			}
 		}
 	}
 	
@@ -51,6 +54,11 @@ public class Registry implements Node {
 		}
 	}
 	
+	/**
+	 * Records a node in the registry.
+	 * @param event - the registration wireframe event
+	 * @return the id of the registering node
+	 */
 	private int registerNode (OverlayNodeSendsRegistration event) {
 		InetAddress ip = event.getInetAddress();
 		InetAddress socketIp = event.getResponseConnection().getSocketIP();
@@ -72,6 +80,7 @@ public class Registry implements Node {
 				responseStr = e.getMessage();
 			}
 		}
+System.out.println("Registration msg: " + responseStr);
 		// Craft the response message
 		RegistryReportsRegistrationStatus response = 
 				new RegistryReportsRegistrationStatus(registeredId, responseStr);

@@ -9,6 +9,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Scanner;
 
+import cs455.overlay.transport.TCPConnection;
 import cs455.overlay.transport.TCPServerThread;
 import cs455.overlay.wireframes.Event;
 import cs455.overlay.wireframes.OverlayNodeSendsRegistration;
@@ -19,6 +20,7 @@ public class MessagingNode implements Node {
 	private TCPServerThread server;
 	private Thread serverThread;
 	private int registeredId;
+	private TCPConnection registry;
 	
 	private static void usage() {
 		System.out.println("java MessagingNode <server> <port>");
@@ -30,23 +32,27 @@ public class MessagingNode implements Node {
 			usage();
 		}
 		MessagingNode messagingNode = new MessagingNode();
-		// Parse the ip and port
-		InetAddress registryAddr = null;
-		int port = 0;
+		/*
+		 * Attempt to connect to host and register messenger with the host.
+		 */
 		try {
-			registryAddr = InetAddress.getByName(args[0]);
-			port = Integer.parseInt(args[1]);
+			// Parse IP and port num
+			InetAddress registryAddr = InetAddress.getByName(args[0]);
+			int port = Integer.parseInt(args[1]);
+			// You must open a server before you register, since the host needs the server port
 			messagingNode.runServer();
-			messagingNode.registeredId = 
-					messagingNode.registerNode(registryAddr, port, messagingNode.server.getPort());
-			if (messagingNode.registeredId == -1) {
-				messagingNode.quit();
-			}
+			// Attemp to connect to the server
+			Socket socket = new Socket (registryAddr, port);
+			messagingNode.registry = new TCPConnection(socket, messagingNode.server);
+			messagingNode.sendRegistrationRequest(messagingNode.server.getPort());
 		} catch (UnknownHostException e) {
 			System.err.println("Unable to find host IP");
 			return;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return;
 		}
-		// Open reader from the user
+		// Scan for user input
 		Scanner sysin = new Scanner (System.in);
 		while (true) {
 			System.out.println("Enter a command: ");
@@ -97,52 +103,47 @@ public class MessagingNode implements Node {
 		return;
 	}
 	
-	private int registerNode (InetAddress ip, int registryPort, int hostPort) {
+	/**
+	 * Send node's information to the registry.
+	 * @param ip - The registry's IP
+	 * @param registryPort - The registry's Port
+	 * @param hostPort - The port that this host is listening on
+	 * @return
+	 */
+	private void sendRegistrationRequest (int hostPort) {
 		try {
-			Socket registry = new Socket (ip, registryPort);
 			InetAddress localhost = InetAddress.getLocalHost();
-			// Attempt to register node with registry
 			OverlayNodeSendsRegistration o = new OverlayNodeSendsRegistration(localhost, hostPort);
-			DataOutputStream dout = new DataOutputStream(registry.getOutputStream());
-			byte[] toWrite = o.getBytes();
-			dout.writeInt(toWrite.length);
-			dout.write(toWrite);
-			// Read server response
-			DataInputStream din = new DataInputStream(registry.getInputStream());
-			int responseLen = din.readInt();
-			byte [] responseMsg = new byte [responseLen];
-			din.read(responseMsg, 0, responseLen);
-			// Close the connection to the registry
-			registry.close();
-			// Unmarshal the response and check for registration success
-			if (responseMsg[0] == Protocol.REGISTRY_REPORTS_REGISTRATION_STATUS.getValue()) {
-				RegistryReportsRegistrationStatus r = new RegistryReportsRegistrationStatus(responseMsg, null);
-				int registerID = r.getSuccessStatus();
-				System.out.println(r.getInfoString());
-				return registerID;
-			} else {
-				quit();
-			}
+			registry.sendMessage(o.getBytes());  // Send registration message
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		return -1;
+	}
+	
+	/**
+	 * Verify registration status. If registration failure, then shut down the messaging node.
+	 */
+	private void reportRegistration (RegistryReportsRegistrationStatus r) {
+		InetAddress rIp = r.getResponseConnection().getSocketIP();
+		registeredId = r.getSuccessStatus();
+		// If the ip didn't come from the registry don't recognize this registration
+		if (!registry.getSocketIP().equals(rIp)) {
+			System.err.println("Incoming IP doesn't match registry");
+			quit();
+		// If registration failed shut the system down
+		} else if (registeredId == -1) {
+			System.err.println("Registration failed: " + r.getInfoString());
+			quit();
+		} else {
+			System.out.println(r.getInfoString());
+		}
 	}
 
 	@Override
 	public void onEvent(Event event) {
 		switch (event.getType()) {
 			case REGISTRY_REPORTS_REGISTRATION_STATUS:
-				RegistryReportsRegistrationStatus r = (RegistryReportsRegistrationStatus) event;
-				registeredId = r.getSuccessStatus();
-				// If registration failed shut the system down
-				if (registeredId == -1) {
-					System.err.println("Registration failed: " + r.getInfoString());
-					tearDown();
-					System.exit(0);
-				} else {
-					System.out.println(r.getInfoString());
-				}
+				reportRegistration((RegistryReportsRegistrationStatus) event);
 				break;
 			default:
 				System.out.println(event.getBytes());
