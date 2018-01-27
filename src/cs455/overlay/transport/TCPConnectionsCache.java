@@ -1,6 +1,7 @@
 package cs455.overlay.transport;
 
-import java.util.ArrayList;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * A collection of TCP connections created by the TCP Server Thread.
@@ -8,19 +9,24 @@ import java.util.ArrayList;
  * @author Brandt Reutimann
  */
 @SuppressWarnings("serial")
-public class TCPConnectionsCache extends ArrayList<TCPConnection> {
-	/**
-	 * Use a linear search to find the connection
-	 * @param uuid - the uuid of the connection being searched for.
-	 * @return
-	 */
-	public int getConnectionIndexByID(String uuid) {
-		for (int i = 0; i < size(); i++) {
-			TCPConnection c = get(i);
-			if (c.getID().equals(uuid)) {
-				return i;
-			}
+public class TCPConnectionsCache extends TreeMap<Integer, TCPConnection> {
+	
+	public synchronized int addConnectionToCache (int id, TCPConnection conn) {
+		// Two connections with the same id not allowed
+		if (get(id) != null) {
+			return -1;
+		} else {
+			put(id, conn);
+			return id;
 		}
-		return -1;
+	}
+	
+	public synchronized int removeConnectionFromCache (int id) {
+		if (get(id) == null) {
+			return -1;
+		} else {
+			remove(id);
+			return id;
+		}
 	}
 }

@@ -28,14 +28,13 @@ public class TCPConnection {
 	private Thread sender;
 	private Thread receiver;
 	private AtomicBoolean isRunning;
-	private String uniqueID = null;
+	private int uniqueID = -1;
 	
 	public TCPConnection (Socket socket, TCPServerThread master) {
 		this.socket = socket;
 		isRunning = new AtomicBoolean (true);
 		messageQueue = new LinkedBlockingQueue<byte[]>(50);
 		this.master = master;
-		uniqueID = UUID.randomUUID().toString();
 		try {
 			sender = new Thread (new TCPSenderThread(), "Sender-Thread");
 			receiver = new Thread (new TCPReceiverThread(), "Receiver-Thread");
@@ -66,7 +65,11 @@ public class TCPConnection {
 		return socket.getInetAddress();
 	}
 	
-	public String getID() {
+	public void setID(int i) {
+		uniqueID = i;
+	}
+	
+	public int getID() {
 		return uniqueID;
 	}
 	

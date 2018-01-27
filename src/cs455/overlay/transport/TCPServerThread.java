@@ -5,6 +5,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import cs455.overlay.node.Node;
@@ -15,10 +17,13 @@ public class TCPServerThread implements Runnable {
 	private Node master;
 	private TCPConnectionsCache activeConnections;
 	private AtomicBoolean isRunning;
+	private Map<Integer, TCPConnection> tempConnections;
+	private int tempIDCounter = -1;
 	
 	public TCPServerThread (Node listeningNode) throws IOException {
 		master = listeningNode;
 		activeConnections = new TCPConnectionsCache();
+		tempConnections = new TreeMap<Integer, TCPConnection>();
 		isRunning = new AtomicBoolean(true);
 		// A port of 0, chooses a randomly available port
 		serversocket = new ServerSocket(0);
@@ -31,8 +36,9 @@ public class TCPServerThread implements Runnable {
 			while (isRunning.get()) {
 				Socket socket = serversocket.accept();
 				TCPConnection newConnection = new TCPConnection(socket, this);
+				newConnection.setID(tempIDCounter);
+				tempConnections.put(tempIDCounter--, newConnection);
 				System.out.println("New connection received from: " + socket.getInetAddress().getHostAddress());
-				activeConnections.add(newConnection);
 			}
 		} catch (SocketException e) {
 			System.err.println("Server Socket closed");
@@ -47,8 +53,8 @@ public class TCPServerThread implements Runnable {
 		try {
 			serversocket.close();
 			// Close and remove all active collections
-			for (TCPConnection c : activeConnections) {
-				c.close();
+			for (int i : activeConnections.keySet()) {
+				activeConnections.get(i).close();
 			}
 			activeConnections.clear();
 		} catch (IOException e) {
@@ -77,9 +83,12 @@ public class TCPServerThread implements Runnable {
 	}
 	
 	public void closeConnection(TCPConnection tconn) {
-		int index = activeConnections.getConnectionIndexByID(tconn.getID());
-		if (index != -1) {
-			activeConnections.remove(index);
+		// Negative ids are for the temp space
+		if (tconn.getID() < 0) {
+			tempConnections.remove(tconn.getID());
+		} else {
+			// All other ids are for the connections cache
+			activeConnections.removeConnectionFromCache(tconn.getID());
 		}
 		tconn.close();
 		return;
@@ -89,8 +98,12 @@ public class TCPServerThread implements Runnable {
 		master.onEvent(e);
 	}
 	
-	public synchronized void addConnectionToCache (TCPConnection tconn) {
-		activeConnections.add(tconn);
+	public synchronized void addConnectionToCache (int id, TCPConnection tconn) {
+		// Remove from the temporary connections cache
+		tempConnections.remove(tconn.getID());
+		// Add to the primary connections cache
+		tconn.setID(id);
+		activeConnections.addConnectionToCache(id, tconn);
 	}
 	
 }

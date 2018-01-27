@@ -75,6 +75,8 @@ public class Registry implements Node {
 				// If there is not exception than registration was successful
 				responseStr = String.format("Registration successful, "
 						+ "there are currently %d nodes in the overlay\n", routingTable.size());
+				// Add this connection to the connections cache
+				server.addConnectionToCache(registeredId, event.getResponseConnection());
 			} catch (RoutingTableException e) {
 				// Routing table exception occurs if the table is full, or the entry is duplicate
 				responseStr = e.getMessage();
