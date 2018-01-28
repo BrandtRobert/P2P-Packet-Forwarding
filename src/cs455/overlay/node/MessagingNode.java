@@ -1,19 +1,17 @@
 package cs455.overlay.node;
 
-import java.io.DataOutputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.util.Arrays;
 import java.util.Scanner;
 
 import cs455.overlay.transport.TCPConnection;
 import cs455.overlay.transport.TCPServerThread;
 import cs455.overlay.wireframes.Event;
+import cs455.overlay.wireframes.OverlayNodeSendsDeregistration;
 import cs455.overlay.wireframes.OverlayNodeSendsRegistration;
-import cs455.overlay.wireframes.Protocol;
+import cs455.overlay.wireframes.RegistryReportsDeregistrationStatus;
 import cs455.overlay.wireframes.RegistryReportsRegistrationStatus;
 
 public class MessagingNode implements Node {
@@ -62,6 +60,8 @@ public class MessagingNode implements Node {
 				sysin.close();
 				System.out.println("System Exiting...");
 				messagingNode.quit();
+			} else if (input.equals("exit-overlay")) {
+				messagingNode.sendDegistrationRequest();
 			}
 		}
 	}
@@ -104,6 +104,21 @@ public class MessagingNode implements Node {
 	}
 	
 	/**
+	 * Sends a deregistration request to the server.
+	 */
+	private void sendDegistrationRequest() {
+		InetAddress localhost;
+		try {
+			localhost = InetAddress.getLocalHost();
+			int port = server.getPort();
+			OverlayNodeSendsDeregistration o = new OverlayNodeSendsDeregistration(localhost, port, registeredId);
+			registry.sendMessage(o.getBytes());
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	/**
 	 * Send node's information to the registry.
 	 * @param ip - The registry's IP
 	 * @param registryPort - The registry's Port
@@ -138,12 +153,29 @@ public class MessagingNode implements Node {
 			System.out.println(r.getInfoString());
 		}
 	}
+	
+	private void reportDeregistration (RegistryReportsDeregistrationStatus r) {
+		InetAddress rIp = r.getResponseConnection().getSocketIP();
+		registeredId = r.getSuccessStatus();
+		// If the ip didn't come from the registry don't recognize this registration
+		if (!registry.getSocketIP().equals(rIp)) {
+			System.err.println("Incoming IP doesn't match registry");
+		} else if (registeredId == -1) {
+			System.err.println("deregistration failed: " + r.getInfoString());
+		} else {
+			System.out.println(r.getInfoString());
+			quit();
+		}
+	}
 
 	@Override
 	public void onEvent(Event event) {
 		switch (event.getType()) {
 			case REGISTRY_REPORTS_REGISTRATION_STATUS:
 				reportRegistration((RegistryReportsRegistrationStatus) event);
+				break;
+			case REGISTRY_REPORTS_DEREGISTRATION_STATUS:
+				reportDeregistration((RegistryReportsDeregistrationStatus) event);
 				break;
 			default:
 				System.out.println(event.getBytes());

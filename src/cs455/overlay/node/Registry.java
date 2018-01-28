@@ -6,6 +6,7 @@ import java.util.Scanner;
 
 import cs455.overlay.routing.RoutingTable;
 import cs455.overlay.routing.RoutingTable.RoutingTableException;
+import cs455.overlay.routing.RoutingTableEntry;
 import cs455.overlay.transport.TCPServerThread;
 import cs455.overlay.wireframes.*;
 
@@ -46,12 +47,49 @@ public class Registry implements Node {
 			case OVERLAY_NODE_SENDS_REGISTRATION:
 				registerNode((OverlayNodeSendsRegistration) event);
 				break;
+			case OVERLAY_NODE_SENDS_DEREGISTRATION:
+				deregisterNode((OverlayNodeSendsDeregistration) event);
+				break;
 			// Do nothing in the default case
 			default:
 				String msg = new String (event.getBytes());
 				System.out.println(msg);
 				break;
 		}
+	}
+	
+	/**
+	 * Removes a node from the registry.
+	 * @param event - the registration wireframe event
+	 * @return the id of the registering node
+	 */
+	private void deregisterNode(OverlayNodeSendsDeregistration event) {
+		InetAddress ip = event.getInetAddress();
+		InetAddress socketIp = event.getResponseConnection().getSocketIP();
+		int portnum = event.getPort();
+		int registeredId = event.getRegisteredID();
+		String responseStr = "";
+		// Verify the ip address given matches the connection
+		if (!ip.equals(socketIp)) {
+			responseStr = String.format("Given IP address: %s, does not match socket IP: %s\n", ip, socketIp);
+		} else {
+			RoutingTableEntry re = routingTable.getEntryByID(registeredId);
+			// Verify that the entry's matches the one in the routing table
+			if (re.getIp().equals(socketIp) && re.getPort() == portnum) {
+				routingTable.remove(registeredId);
+				responseStr = String.
+						format("Deregistration request successful, there are now (%d) nodes in the overlay.", routingTable.size()); 
+			} else {
+				// If the entry is unverified, do not honor the request
+				responseStr = String.format("Request IP: %s, and ID: %d do not match routing table entry", ip, registeredId);
+				registeredId = -1;
+			}
+		}
+		// Craft the response message
+		RegistryReportsDeregistrationStatus response = 
+				new RegistryReportsDeregistrationStatus(registeredId, responseStr);
+		// Send the response message back to the client
+		event.getResponseConnection().sendMessage(response.getBytes());
 	}
 	
 	/**
@@ -86,11 +124,14 @@ public class Registry implements Node {
 		RegistryReportsRegistrationStatus response = 
 				new RegistryReportsRegistrationStatus(registeredId, responseStr);
 		// Send the response message back to the client
-		event.getResponseConnection().sendMessage(response.getBytes());
-		/**
-		 * @TODO handle scenario where node dies right after registration
-		 */
-		return registeredId;
+		if (event.getResponseConnection().isAlive()) {
+			event.getResponseConnection().sendMessage(response.getBytes());
+			return registeredId;
+		} else {
+			// If the client died after registration request, then remove them from the registry
+			routingTable.remove(registeredId);
+			return -1;
+		}
 	}
 	
 	/**

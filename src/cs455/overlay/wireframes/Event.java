@@ -11,4 +11,5 @@ public interface Event {
 	public Protocol getType();
 	public byte[] getBytes();
 	public TCPConnection getResponseConnection();
+	
 }

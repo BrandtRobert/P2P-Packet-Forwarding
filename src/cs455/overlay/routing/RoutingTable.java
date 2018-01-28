@@ -50,7 +50,7 @@ public class RoutingTable {
 	}
 	
 	public synchronized void remove (int id) {
-		
+		routingtable.remove(id);
 	}
 	
 	public int size() {
@@ -58,10 +58,18 @@ public class RoutingTable {
 	}
 	
 	public void printManifest () {
+		if (routingtable.isEmpty()) {
+			System.out.println("No nodes are present in the manifest");
+			return;
+		}
 		for (Map.Entry<Integer, RoutingTableEntry> r : routingtable.entrySet()) {
 			int key = r.getKey();
 			RoutingTableEntry entry = r.getValue();
 			System.out.println("Entry id: " + key + ", IP: " + entry.getIp() + ", Port: " + entry.getPort());
 		}
+	}
+	
+	public RoutingTableEntry getEntryByID(int id) {
+		return routingtable.get(id);
 	}
 }

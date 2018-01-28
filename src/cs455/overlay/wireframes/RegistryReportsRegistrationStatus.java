@@ -12,7 +12,7 @@ import cs455.overlay.transport.TCPConnection;
 
 public class RegistryReportsRegistrationStatus implements Event {
 	
-	private Protocol msgType = Protocol.REGISTRY_REPORTS_REGISTRATION_STATUS;
+	protected Protocol msgType = Protocol.REGISTRY_REPORTS_REGISTRATION_STATUS;
 	private int successStatus;
 	private byte infoLength;
 	private String infoString;

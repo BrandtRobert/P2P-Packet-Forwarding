@@ -47,6 +47,10 @@ public class TCPConnection {
 		}
 	}
 	
+	public boolean isAlive() {
+		return !socket.isClosed();
+	}
+	
 	/**
 	 * Adds a new message to the message queue.
 	 * These messages will eventually be sent to the receiver.
