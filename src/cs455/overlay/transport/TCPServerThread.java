@@ -106,4 +106,20 @@ public class TCPServerThread implements Runnable {
 		activeConnections.addConnectionToCache(id, tconn);
 	}
 	
+	public TCPConnection getConnectionFromCache (int id) {
+		return activeConnections.getConnectionById(id);
+	}
+	
+	public void listCacheConnections () {
+		System.out.println("All active connections: ");
+		for (Map.Entry<Integer, TCPConnection> c : activeConnections.entrySet()) {
+			int key = c.getKey();
+			TCPConnection entry = c.getValue();
+			System.out.println("\tEntry id: " + key + ", IP: " + entry.getSocketIP() + ", Port: " + entry.getRemotePort());
+		}
+	}
+	
+	public TCPConnectionsCache getActiveConnections() {
+		return this.activeConnections;
+	}
 }

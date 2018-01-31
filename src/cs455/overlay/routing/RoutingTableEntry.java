@@ -13,6 +13,7 @@ import java.net.InetAddress;
 public class RoutingTableEntry {
 	private InetAddress ip; // IP address of this host
 	private int port;		// Port the host is listening on
+	private int id;
 	
 	public RoutingTableEntry (InetAddress ip, int port) {
 		this.ip = ip;
@@ -84,6 +85,18 @@ public class RoutingTableEntry {
 			return false;
 		}
 		return true;
+	}
+	/**
+	 * @return the id
+	 */
+	public int getId() {
+		return id;
+	}
+	/**
+	 * @param id the id to set
+	 */
+	public void setId(int id) {
+		this.id = id;
 	}
 	
 }

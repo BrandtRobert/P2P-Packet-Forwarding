@@ -17,6 +17,12 @@ public class EventFactory {
 			return new OverlayNodeSendsDeregistration(msg, incomingConnection);
 		} else if (msgType == Protocol.REGISTRY_REPORTS_DEREGISTRATION_STATUS.getValue()) {
 			return new RegistryReportsDeregistrationStatus(msg, incomingConnection);
+		} else if (msgType == Protocol.REGISTRY_SENDS_NODE_MANIFEST.getValue()) {
+			return new RegistrySendsNodeManifest(msg, incomingConnection);
+		} else if (msgType == Protocol.NODE_REPORTS_OVERLAY_SETUP_STATUS.getValue()) {
+			return new NodeReportsOverlaySetupStatus(msg, incomingConnection);
+		} else if (msgType == Protocol.REGISTRY_REQUESTS_TASK_INITIATE.getValue()) {
+			return new RegistryRequestsTaskInitiate(msg, incomingConnection);
 		} else {
 			System.err.println("Unrecognized message type in event factory");
 			return null;

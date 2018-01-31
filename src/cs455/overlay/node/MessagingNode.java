@@ -4,15 +4,21 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Scanner;
 
+import cs455.overlay.routing.RoutingTableEntry;
 import cs455.overlay.transport.TCPConnection;
 import cs455.overlay.transport.TCPServerThread;
 import cs455.overlay.wireframes.Event;
+import cs455.overlay.wireframes.NodeReportsOverlaySetupStatus;
 import cs455.overlay.wireframes.OverlayNodeSendsDeregistration;
 import cs455.overlay.wireframes.OverlayNodeSendsRegistration;
 import cs455.overlay.wireframes.RegistryReportsDeregistrationStatus;
 import cs455.overlay.wireframes.RegistryReportsRegistrationStatus;
+import cs455.overlay.wireframes.RegistryRequestsTaskInitiate;
+import cs455.overlay.wireframes.RegistrySendsNodeManifest;
 
 public class MessagingNode implements Node {
 	private TCPServerThread server;
@@ -154,6 +160,9 @@ public class MessagingNode implements Node {
 		}
 	}
 	
+	/**
+	 * Reports the results of the deregistration request
+	 */
 	private void reportDeregistration (RegistryReportsDeregistrationStatus r) {
 		InetAddress rIp = r.getResponseConnection().getSocketIP();
 		registeredId = r.getSuccessStatus();
@@ -167,6 +176,50 @@ public class MessagingNode implements Node {
 			quit();
 		}
 	}
+	
+	/**
+	 * Using the given routing table from the registry attempt to connect to other nodes.
+	 * Report the result of connection to other nodes to the registry.
+	 */
+	private void connectToOverlay(RegistrySendsNodeManifest event) {
+		System.out.println("Manifest received: " + Arrays.toString(event.getNodeIdManifest()));
+		List<RoutingTableEntry> routingTable = event.getRoutingTable();
+		int numOfFails = 0;
+		for (RoutingTableEntry re : routingTable) {
+			try {
+				Socket socket = new Socket(re.getIp(), re.getPort());
+				server.addConnectionToCache(re.getId(), new TCPConnection(socket, server));
+				System.out.println("\tConnected successfully to Node: " + re.getId() + ", IP: " + 
+									re.getIp() + ", Port: " + re.getPort());
+			} catch (IOException e) {
+				System.err.println("\tUnable to connect to Node: " + re.getId() + ", IP: " + 
+									re.getIp() + ", Port: " + re.getPort());
+				numOfFails++;
+			}
+		}
+		server.listCacheConnections();
+		int successStatus;
+		String infoString;
+		if (numOfFails > 0) {
+			// Report failure to registry
+			successStatus = -1;
+			infoString = String.format("Node: %d, failed to connect to %d nodes", this.registeredId, numOfFails);
+		} else {
+			// Report success
+			successStatus = this.registeredId;
+			infoString = String.format("Node %d, successfully connected to %d nodes", successStatus, routingTable.size());
+		}
+		// Send response to server
+		NodeReportsOverlaySetupStatus response = new NodeReportsOverlaySetupStatus(successStatus, infoString);
+		registry.sendMessage(response.getBytes());
+		return;
+	}
+	
+	private void intiateMessageSend (RegistryRequestsTaskInitiate event) {
+		int numPackets = event.getNumPackets();
+		System.out.println("Registry request to send " + numPackets + " packets");
+		// for the numPackets
+	}
 
 	@Override
 	public void onEvent(Event event) {
@@ -176,6 +229,12 @@ public class MessagingNode implements Node {
 				break;
 			case REGISTRY_REPORTS_DEREGISTRATION_STATUS:
 				reportDeregistration((RegistryReportsDeregistrationStatus) event);
+				break;
+			case REGISTRY_SENDS_NODE_MANIFEST:
+				connectToOverlay((RegistrySendsNodeManifest) event);
+				break;
+			case REGISTRY_REQUESTS_TASK_INITIATE:
+				intiateMessageSend((RegistryRequestsTaskInitiate) event); 
 				break;
 			default:
 				System.out.println(event.getBytes());

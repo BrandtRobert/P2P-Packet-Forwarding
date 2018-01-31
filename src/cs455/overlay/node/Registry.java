@@ -2,11 +2,14 @@ package cs455.overlay.node;
 import java.io.IOException;
 import java.lang.Thread;
 import java.net.InetAddress;
+import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
 import cs455.overlay.routing.RoutingTable;
 import cs455.overlay.routing.RoutingTable.RoutingTableException;
 import cs455.overlay.routing.RoutingTableEntry;
+import cs455.overlay.transport.TCPConnection;
 import cs455.overlay.transport.TCPServerThread;
 import cs455.overlay.wireframes.*;
 
@@ -14,6 +17,8 @@ public class Registry implements Node {
 	private TCPServerThread server;
 	private Thread serverThread;
 	private RoutingTable routingTable;
+	private int nodeTableSize;
+	private boolean setupOverlayComplete = false;
 	
 	public Registry () {
 		routingTable = new RoutingTable();
@@ -26,18 +31,79 @@ public class Registry implements Node {
 		Scanner sysin = new Scanner (System.in);
 		while (true) {
 			System.out.println("Enter a command: ");
-			String input = sysin.next();
+			String input = sysin.nextLine();
+			String [] splits = input.split("\\s+");
 			System.out.println("Command received: " + input);
-			if (input.startsWith("q")) {
+			if (splits[0].startsWith("q")) {
 				registry.tearDown();
 				sysin.close();
 				System.out.println("System Exiting...");
 				System.exit(0);
-			}
-			if (input.equals("list-messaging-nodes")) {
+			} else if (splits[0].equals("list-messaging-nodes")) {
 				registry.routingTable.printManifest();
+			} else if (splits[0].equals("setup-overlay")) {
+				// If a table size is specified use that, otherwise the default is 3
+				registry.nodeTableSize = (splits.length > 1) ? Integer.parseInt(splits[1]): 3;
+				registry.setupOverlay(false);
+			} else if (splits[0].equals("list-routing-tables")) {
+				registry.setupOverlay(true);
+			} else if (splits[0].equals("start")) {
+				if (registry.setupOverlayComplete) {
+					int numPackets = Integer.parseInt(splits[1]);
+					registry.sendTaskInitiate(numPackets);
+				} else {
+					System.err.println("Unable to initiate message sending without overlay setup");
+				}
+				
 			}
 		}
+	}
+	
+	/**
+	 * Sends task initiate
+	 * @param numPackets
+	 */
+	private void sendTaskInitiate(int numPackets) {
+		// Send a task initiate to all nodes
+		for (Map.Entry<Integer, TCPConnection> entry : server.getActiveConnections().entrySet()) {
+			TCPConnection conn = entry.getValue();
+			RegistryRequestsTaskInitiate taskInit = new RegistryRequestsTaskInitiate(numPackets);
+			conn.sendMessage(taskInit.getBytes());
+		}
+	}
+
+	/**
+	 * Dispatches routing tables to all messaging nodes in the manifest
+	 */
+	private void setupOverlay(boolean printTable) {
+		Integer[] keyManifest = routingTable.keyManifest();
+		// If 2**k-1 % tablesize == 0, then a node will select itself in the routing subtable
+		// Not an issue if tablesize > 2 * k
+		if (2*this.nodeTableSize >= keyManifest.length) {
+			System.err.println("Routing table size too large for number of registered nodes, will not setup overlay");
+			return;
+		}
+		// Dispatch routing tables
+		for (int i = 0; i < keyManifest.length; i++) {
+			int keyID = keyManifest[i];
+			List<RoutingTableEntry> subtable = routingTable.getSubTable(keyID, this.nodeTableSize);
+			// If print table only print entries
+			if (printTable) {
+				RoutingTableEntry keyEntry = routingTable.getEntryByID(keyID);
+				System.out.println("Node: " + keyEntry.getId() + ", IP:" + keyEntry.getIp());
+				// Print routing table for now
+				for (RoutingTableEntry r : subtable) {
+					System.out.println("\tNode: " + r.getId() + ", IP: " + r.getIp() + ", Port: " + r.getPort());
+				}
+			// Otherwise dispatch tables to their respective nodes
+			} else {
+				// Send the routing tables to the respective nodes
+				TCPConnection currConnection = server.getConnectionFromCache(keyID);
+				RegistrySendsNodeManifest tableToSend = new RegistrySendsNodeManifest(subtable, keyManifest);
+				currConnection.sendMessage(tableToSend.getBytes());
+			}
+		}
+		this.setupOverlayComplete = true;
 	}
 	
 	@Override
@@ -49,6 +115,10 @@ public class Registry implements Node {
 				break;
 			case OVERLAY_NODE_SENDS_DEREGISTRATION:
 				deregisterNode((OverlayNodeSendsDeregistration) event);
+				break;
+			case NODE_REPORTS_OVERLAY_SETUP_STATUS:
+				NodeReportsOverlaySetupStatus n = (NodeReportsOverlaySetupStatus) event;
+				System.out.println(n.getInfoString());
 				break;
 			// Do nothing in the default case
 			default:

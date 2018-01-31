@@ -1,6 +1,5 @@
 package cs455.overlay.transport;
 
-import java.util.Map;
 import java.util.TreeMap;
 
 /**
@@ -28,5 +27,9 @@ public class TCPConnectionsCache extends TreeMap<Integer, TCPConnection> {
 			remove(id);
 			return id;
 		}
+	}
+	
+	public synchronized TCPConnection getConnectionById (int id) {
+		return get(id);
 	}
 }

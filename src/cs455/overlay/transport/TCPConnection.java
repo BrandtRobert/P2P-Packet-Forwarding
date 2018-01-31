@@ -69,6 +69,10 @@ public class TCPConnection {
 		return socket.getInetAddress();
 	}
 	
+	public int getRemotePort() {
+		return socket.getPort();
+	}
+	
 	public void setID(int i) {
 		uniqueID = i;
 	}
@@ -158,7 +162,10 @@ public class TCPConnection {
 					byte[] data = new byte[dataLength];
 					din.readFully(data, 0, dataLength);
 					Event event = EventFactory.convertBytesToEvent(data, TCPConnection.this);
-					master.onEvent(event);
+					// Handle the event asynchronously, this syntax requires java 8
+					new Thread(()->{
+						master.onEvent(event);
+					}).start();
 				} catch (SocketException e) {
 					System.err.println("Socket connection closed");
 					die();

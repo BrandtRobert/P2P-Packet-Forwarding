@@ -48,7 +48,6 @@ public class RegistryReportsRegistrationStatus implements Event {
 		ByteArrayInputStream baInputStream = new ByteArrayInputStream(msg);
 		DataInputStream din = new DataInputStream (new BufferedInputStream(baInputStream));
 		din.readByte();		// Throw away the first byte (the msg type)
-		// Read the IP address
 		this.successStatus = din.readInt();
 		this.infoLength = din.readByte();
 		byte[] infoArr = new byte [infoLength];
