@@ -29,21 +29,15 @@ public class StatisticsCollectorAndDisplay {
 		}
 		
 		void incrementPacketsSentToNode () {
-			synchronized (packetsSentToNode) {
-				packetsSentToNode++;
-			}
+			packetsSentToNode++;
 		}
 		
 		void incrementPacketsReceivedFromNode () {
-			synchronized (packetsReceivedFromNode) {
-				packetsReceivedFromNode++;
-			}
+			packetsReceivedFromNode++;
 		}
 		
 		void incrementPacketsRelayedToNode () {
-			synchronized (packetsRelayedToNode) {
-				packetsRelayedToNode++;
-			}
+			packetsRelayedToNode++;
 		}
 	}
 	
@@ -114,76 +108,58 @@ public class StatisticsCollectorAndDisplay {
 	 * This should allow multiple threads to increment their specific counter without locking access to others.
 	 */
 
-	public void incrementPacketsSent() {
-		synchronized (packetsSent) {
-			packetsSent++;
-		}
+	public synchronized void incrementPacketsSent() {
+		packetsSent++;
 	}
 	
-	public void incrementPacketsRelayed() {
-		synchronized (packetsRelayed) {
-			packetsRelayed++;
-		}
+	public synchronized void incrementPacketsRelayed() {
+		packetsRelayed++;
 	}
 	
-	public void incrementPacketsReceived() {
-		synchronized (packetsReceived) {
-			packetsReceived++;
-		}
+	public synchronized void incrementPacketsReceived() {
+		packetsReceived++;
 	}
 	
-	public void addToSentSum (long toAdd) {
-		synchronized (sumPacketSent) {
-			sumPacketSent += toAdd;
-		}
+	public synchronized void addToSentSum (long toAdd) {
+		sumPacketSent += toAdd;
 	}
 	
-	public void addToReceivedSum (long toAdd) {
-		synchronized (sumPacketReceived) {
-			sumPacketReceived += toAdd;
-		}
+	public synchronized void addToReceivedSum (long toAdd) {
+		sumPacketReceived += toAdd;
 	}
 	
-	public void incrementPacketsTouched () {
-		synchronized (packetsTouched) {
-			packetsTouched++;
-		}
+	public synchronized void incrementPacketsTouched () {
+		packetsTouched++;
 	}
 	
-	public void incrementPacketsReceivedFrom (int nodeID) {
-		synchronized (packetsPerNode) {
-			NodeCollector n = packetsPerNode.get(nodeID);
-			if (n == null) {
-				n = new NodeCollector();
-				packetsPerNode.put(nodeID, n);
-			}
-			n.incrementPacketsReceivedFromNode();
+	public synchronized void incrementPacketsReceivedFrom (int nodeID) {
+		NodeCollector n = packetsPerNode.get(nodeID);
+		if (n == null) {
+			n = new NodeCollector();
+			packetsPerNode.put(nodeID, n);
 		}
+		n.incrementPacketsReceivedFromNode();
 	}
 	
-	public void incrementPacketsSentTo (int nodeID) {
-		synchronized (packetsPerNode) {
-			NodeCollector n = packetsPerNode.get(nodeID);
-			if (n == null) {
-				n = new NodeCollector();
-				packetsPerNode.put(nodeID, n);
-			}
-			n.incrementPacketsSentToNode();
+	public synchronized void incrementPacketsSentTo (int nodeID) {
+		NodeCollector n = packetsPerNode.get(nodeID);
+		if (n == null) {
+			n = new NodeCollector();
+			packetsPerNode.put(nodeID, n);
 		}
+		n.incrementPacketsSentToNode();
 	}
 	
-	public void incrementPacketsRelayedTo (int nodeID) {
-		synchronized (packetsPerNode) {
-			NodeCollector n = packetsPerNode.get(nodeID);
-			if (n == null) {
-				n = new NodeCollector();
-				packetsPerNode.put(nodeID, n);
-			}
-			n.incrementPacketsRelayedToNode();
+	public synchronized void incrementPacketsRelayedTo (int nodeID) {
+		NodeCollector n = packetsPerNode.get(nodeID);
+		if (n == null) {
+			n = new NodeCollector();
+			packetsPerNode.put(nodeID, n);
 		}
+		n.incrementPacketsRelayedToNode();
 	}
 	
-	public String extendedToString() {
+	public synchronized String extendedToString() {
 		String str = this.toString();
 		String extendedToStr = String.format("\npacketsTouched=%s\nPackets Per Node:\t    Sent\tReceived\t Relayed\n", packetsTouched);
 		int sumSent = 0;
@@ -207,7 +183,7 @@ public class StatisticsCollectorAndDisplay {
 	 * @see java.lang.Object#toString()
 	 */
 	@Override
-	public String toString() {
+	public synchronized String toString() {
 		return String.format(
 				"StatisticsCollectorAndDisplay:\npacketsSent=%s\npacketsRelayed=%s\npacketsReceived=%s\nsumPacketSent=%s\nsumPacketReceived=%s",
 				packetsSent, packetsRelayed, packetsReceived, sumPacketSent, sumPacketReceived);
@@ -216,42 +192,42 @@ public class StatisticsCollectorAndDisplay {
 	/**
 	 * @return the packetsSent
 	 */
-	public Integer getPacketsSent() {
+	public synchronized Integer getPacketsSent() {
 		return packetsSent;
 	}
 
 	/**
 	 * @return the packetsRelayed
 	 */
-	public Integer getPacketsRelayed() {
+	public synchronized Integer getPacketsRelayed() {
 		return packetsRelayed;
 	}
 
 	/**
 	 * @return the packetsReceived
 	 */
-	public Integer getPacketsReceived() {
+	public synchronized Integer getPacketsReceived() {
 		return packetsReceived;
 	}
 
 	/**
 	 * @return the sumPacketSent
 	 */
-	public Long getSumPacketSent() {
+	public synchronized Long getSumPacketSent() {
 		return sumPacketSent;
 	}
 
 	/**
 	 * @return the sumPacketReceived
 	 */
-	public Long getSumPacketReceived() {
+	public synchronized Long getSumPacketReceived() {
 		return sumPacketReceived;
 	}
 
 	/**
 	 * @return the nodeID
 	 */
-	public int getNodeID() {
+	public synchronized int getNodeID() {
 		return nodeID;
 	}
 }

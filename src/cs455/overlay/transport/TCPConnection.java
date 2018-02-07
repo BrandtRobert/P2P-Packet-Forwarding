@@ -21,9 +21,8 @@ import cs455.overlay.wireframes.EventFactory;
  */
 public class TCPConnection {
 	private Socket socket;
-	private LinkedBlockingQueue<byte[]> messageQueue;	// A thread safe queue for holding messages
 	private TCPServerThread master;	// The master contains an onEvent method that is triggered when a new message is received
-	private Thread sender;
+	private TCPSenderThread sender;
 	private Thread receiver;
 	private AtomicBoolean isRunning;
 	private int uniqueID = -1;
@@ -31,12 +30,10 @@ public class TCPConnection {
 	public TCPConnection (Socket socket, TCPServerThread master) {
 		this.socket = socket;
 		isRunning = new AtomicBoolean (true);
-		messageQueue = new LinkedBlockingQueue<byte[]>(1000);
 		this.master = master;
 		try {
-			sender = new Thread (new TCPSenderThread(), "Sender-Thread");
+			sender = new TCPSenderThread();
 			receiver = new Thread (new TCPReceiverThread(), "Receiver-Thread");
-			sender.start();
 			receiver.start();
 		} 
 		catch (IOException e) {
@@ -56,12 +53,8 @@ public class TCPConnection {
 	 */
 	public void sendMessage (byte [] message) {
 		try {
-			if (messageQueue.remainingCapacity() == 0) {
-				System.out.println("Message queue capped waiting for space...");
-			}
-			messageQueue.put(message);
-		} catch (InterruptedException e) {
-			System.err.println("Thread interrupted while adding item to the message queue");
+			sender.socketWrite(message);
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
@@ -105,9 +98,11 @@ public class TCPConnection {
 	
 	private class TCPSenderThread implements Runnable {
 		private DataOutputStream dout;
+		private LinkedBlockingQueue<byte[]> messageQueue;	// A thread safe queue for holding messages
 		
 		public TCPSenderThread () throws IOException {
 			dout = new DataOutputStream(socket.getOutputStream());
+			messageQueue = new LinkedBlockingQueue<byte[]>();
 		}
 		
 		/**
@@ -129,12 +124,20 @@ public class TCPConnection {
 			}
 		}
 		
+		public void putOnMessageQueue (byte [] msg) {
+			try {
+				this.messageQueue.put(msg);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+		
 		/**
 		 * Sends a message over the socket
 		 * @param message - a byte string containing the message pay-load
 		 * @throws IOException
 		 */
-		private void socketWrite (byte [] message) throws IOException {
+		public synchronized void socketWrite (byte [] message) throws IOException {
 			// Review framing protocols for why this is necessary
 			// https://blog.stephencleary.com/2009/04/message-framing.html
 			int length = message.length;
