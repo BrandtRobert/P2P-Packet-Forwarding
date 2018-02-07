@@ -2,17 +2,25 @@ package cs455.overlay.node;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.Scanner;
 
+import cs455.overlay.routing.RoutingTable;
 import cs455.overlay.routing.RoutingTableEntry;
 import cs455.overlay.transport.TCPConnection;
 import cs455.overlay.transport.TCPServerThread;
+import cs455.overlay.util.StatisticsCollectorAndDisplay;
 import cs455.overlay.wireframes.Event;
 import cs455.overlay.wireframes.NodeReportsOverlaySetupStatus;
+import cs455.overlay.wireframes.OverlayNodeReportsTaskFinished;
+import cs455.overlay.wireframes.OverlayNodeReportsTrafficSummary;
+import cs455.overlay.wireframes.OverlayNodeSendsData;
 import cs455.overlay.wireframes.OverlayNodeSendsDeregistration;
 import cs455.overlay.wireframes.OverlayNodeSendsRegistration;
 import cs455.overlay.wireframes.RegistryReportsDeregistrationStatus;
@@ -25,6 +33,9 @@ public class MessagingNode implements Node {
 	private Thread serverThread;
 	private int registeredId;
 	private TCPConnection registry;
+	private Integer [] nodeManifest;
+	private RoutingTable routingtable;
+	private StatisticsCollectorAndDisplay statistics;
 	
 	private static void usage() {
 		System.out.println("java MessagingNode <server> <port>");
@@ -46,11 +57,18 @@ public class MessagingNode implements Node {
 			// You must open a server before you register, since the host needs the server port
 			messagingNode.runServer();
 			// Attemp to connect to the server
-			Socket socket = new Socket (registryAddr, port);
+			InetSocketAddress sockAddr = new InetSocketAddress(registryAddr, port);
+			Socket socket = new Socket();
+			// Set timeout on socket
+			socket.connect(sockAddr, 5000);
+			
 			messagingNode.registry = new TCPConnection(socket, messagingNode.server);
 			messagingNode.sendRegistrationRequest(messagingNode.server.getPort());
 		} catch (UnknownHostException e) {
 			System.err.println("Unable to find host IP");
+			return;
+		} catch (SocketTimeoutException e) {
+			System.err.println("MessagingNode failed to connect to server on socket timeout, please check IP and Port");
 			return;
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -68,8 +86,19 @@ public class MessagingNode implements Node {
 				messagingNode.quit();
 			} else if (input.equals("exit-overlay")) {
 				messagingNode.sendDegistrationRequest();
+			} else if (input.equals("stats")) {
+				System.out.println(messagingNode.statistics);
+			} else if (input.equals("print-counters-and-diagnostics")) {
+				messagingNode.printDiagnosticInfo();
 			}
 		}
+	}
+	
+	/**
+	 * Prints info about current state of the node
+	 */
+	private void printDiagnosticInfo() {
+		System.out.println(statistics.extendedToString());
 	}
 
 	/**
@@ -147,6 +176,7 @@ public class MessagingNode implements Node {
 	private void reportRegistration (RegistryReportsRegistrationStatus r) {
 		InetAddress rIp = r.getResponseConnection().getSocketIP();
 		registeredId = r.getSuccessStatus();
+		statistics = new StatisticsCollectorAndDisplay(registeredId);
 		// If the ip didn't come from the registry don't recognize this registration
 		if (!registry.getSocketIP().equals(rIp)) {
 			System.err.println("Incoming IP doesn't match registry");
@@ -183,9 +213,10 @@ public class MessagingNode implements Node {
 	 */
 	private void connectToOverlay(RegistrySendsNodeManifest event) {
 		System.out.println("Manifest received: " + Arrays.toString(event.getNodeIdManifest()));
-		List<RoutingTableEntry> routingTable = event.getRoutingTable();
+		this.nodeManifest = event.getNodeIdManifest();
+		this.routingtable = new RoutingTable (event.getRoutingTable());
 		int numOfFails = 0;
-		for (RoutingTableEntry re : routingTable) {
+		for (RoutingTableEntry re : event.getRoutingTable()) {
 			try {
 				Socket socket = new Socket(re.getIp(), re.getPort());
 				server.addConnectionToCache(re.getId(), new TCPConnection(socket, server));
@@ -207,7 +238,7 @@ public class MessagingNode implements Node {
 		} else {
 			// Report success
 			successStatus = this.registeredId;
-			infoString = String.format("Node %d, successfully connected to %d nodes", successStatus, routingTable.size());
+			infoString = String.format("Node %d, successfully connected to %d nodes", successStatus, event.getRoutingTable().size());
 		}
 		// Send response to server
 		NodeReportsOverlaySetupStatus response = new NodeReportsOverlaySetupStatus(successStatus, infoString);
@@ -217,8 +248,62 @@ public class MessagingNode implements Node {
 	
 	private void intiateMessageSend (RegistryRequestsTaskInitiate event) {
 		int numPackets = event.getNumPackets();
-		System.out.println("Registry request to send " + numPackets + " packets");
-		// for the numPackets
+		// Choose a node randomly and send a packet to it
+		Random rand = new Random();
+		for (int i = 0; i < numPackets; i++) {
+			// Choose a random node
+			int randIndex = rand.nextInt(nodeManifest.length);
+			// This node can't send messages to itself
+			while (nodeManifest[randIndex] == this.registeredId) 
+				randIndex = rand.nextInt(nodeManifest.length);
+			int randomNode = nodeManifest[randIndex];
+			// Get the route to that node
+			int route = routingtable.getClosestNode(randomNode);
+			// Craft a payload, a random number between int max and int min
+			int payload = rand.nextInt(Integer.MAX_VALUE) * (rand.nextBoolean() ? 1 : -1);
+			// Craft the message to send
+			OverlayNodeSendsData packet = new OverlayNodeSendsData(randomNode, this.registeredId, payload);
+			// Send it
+			server.getConnectionFromCache(route).sendMessage(packet.getBytes());
+			// Increment statistics
+			statistics.incrementPacketsSent();
+			statistics.addToSentSum(payload);
+			statistics.incrementPacketsSentTo(randomNode);
+		}
+		// Report task finished
+		try {
+			InetAddress localhost = InetAddress.getLocalHost();
+			OverlayNodeReportsTaskFinished tFinished = 
+					new OverlayNodeReportsTaskFinished(localhost, server.getPort(), this.registeredId);
+			registry.sendMessage(tFinished.getBytes());
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void onNextPacket(OverlayNodeSendsData event) {
+		statistics.incrementPacketsTouched();
+		int destination = event.getDestID();
+		if (destination == this.registeredId) {
+			// packet received, increment statistics
+			statistics.incrementPacketsReceivedFrom(event.getSrcID());
+			statistics.incrementPacketsReceived();
+			statistics.addToReceivedSum(event.getPayload());
+			return;
+		}
+		// Forward the packet
+		statistics.incrementPacketsRelayed();
+		statistics.incrementPacketsRelayedTo(destination);
+		int route = routingtable.getClosestNode(destination);
+		event.addToDisseminationTrace(this.registeredId);
+		server.getConnectionFromCache(route).sendMessage(event.getBytes());
+	}
+	
+	private void sendTrafficSummary() {
+		OverlayNodeReportsTrafficSummary summary = new OverlayNodeReportsTrafficSummary(statistics);
+		registry.sendMessage(summary.getBytes());
+		statistics = new StatisticsCollectorAndDisplay(registeredId);
+		System.out.println("Sending traffic summary...");
 	}
 
 	@Override
@@ -236,9 +321,16 @@ public class MessagingNode implements Node {
 			case REGISTRY_REQUESTS_TASK_INITIATE:
 				intiateMessageSend((RegistryRequestsTaskInitiate) event); 
 				break;
+			case OVERLAY_NODE_SENDS_DATA:
+				onNextPacket((OverlayNodeSendsData) event);
+				break;
+			case REGISTRY_REQUESTS_TRAFFIC_SUMMARY:
+				sendTrafficSummary();
+				break;
 			default:
 				System.out.println(event.getBytes());
 				break;
 		}
 	}
+
 }

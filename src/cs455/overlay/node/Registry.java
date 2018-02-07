@@ -2,6 +2,7 @@ package cs455.overlay.node;
 import java.io.IOException;
 import java.lang.Thread;
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -11,6 +12,7 @@ import cs455.overlay.routing.RoutingTable.RoutingTableException;
 import cs455.overlay.routing.RoutingTableEntry;
 import cs455.overlay.transport.TCPConnection;
 import cs455.overlay.transport.TCPServerThread;
+import cs455.overlay.util.StatisticsCollectorAndDisplay;
 import cs455.overlay.wireframes.*;
 
 public class Registry implements Node {
@@ -19,14 +21,24 @@ public class Registry implements Node {
 	private RoutingTable routingTable;
 	private int nodeTableSize;
 	private boolean setupOverlayComplete = false;
+	private Integer finishedNodes;
+	private Integer trafficSummaryCount;
+	private List<StatisticsCollectorAndDisplay> statistics;
+	
+	private int seconds = 0;
 	
 	public Registry () {
 		routingTable = new RoutingTable();
+		finishedNodes = 0;
+		trafficSummaryCount = 0;
+		statistics = new ArrayList<StatisticsCollectorAndDisplay>();
 	}
 	
 	public static void main (String [] args) {
 		Registry registry = new Registry();
 		registry.runServer();
+		// Delay to place before sending out traffic summary requests
+		registry.seconds = (args.length == 1) ? Integer.parseInt(args[0]) : 5;
 		// Open reader from the user
 		Scanner sysin = new Scanner (System.in);
 		while (true) {
@@ -79,7 +91,7 @@ public class Registry implements Node {
 		Integer[] keyManifest = routingTable.keyManifest();
 		// If 2**k-1 % tablesize == 0, then a node will select itself in the routing subtable
 		// Not an issue if tablesize > 2 * k
-		if (2*this.nodeTableSize >= keyManifest.length) {
+		if (2*this.nodeTableSize >= keyManifest.length && this.nodeTableSize > 1) {
 			System.err.println("Routing table size too large for number of registered nodes, will not setup overlay");
 			return;
 		}
@@ -120,6 +132,12 @@ public class Registry implements Node {
 				NodeReportsOverlaySetupStatus n = (NodeReportsOverlaySetupStatus) event;
 				System.out.println(n.getInfoString());
 				break;
+			case OVERLAY_NODE_REPORTS_TASK_FINISHED:
+				reportNodeTaskFinish((OverlayNodeReportsTaskFinished) event);
+				break;
+			case OVERLAY_NODE_REPORTS_TRAFFIC_SUMMARY:
+				reportNodeTrafficSummary((OverlayNodeReportsTrafficSummary) event);
+				break;
 			// Do nothing in the default case
 			default:
 				String msg = new String (event.getBytes());
@@ -128,6 +146,81 @@ public class Registry implements Node {
 		}
 	}
 	
+	/**
+	 * Record the node's traffic summary.
+	 */
+	private void reportNodeTrafficSummary(OverlayNodeReportsTrafficSummary event) {
+		int nodeId = event.getId();
+		RoutingTableEntry entry = routingTable.getEntryByID(nodeId);
+		if (!entry.getIp().equals(event.getResponseConnection().getSocketIP())) {
+			System.err.println("Cannot verify node ip for traffic summary");
+			return;
+		}
+		StatisticsCollectorAndDisplay nodeState = new StatisticsCollectorAndDisplay(event);
+		synchronized (statistics) {
+			statistics.add(nodeState);
+		}
+		synchronized (trafficSummaryCount) {
+			trafficSummaryCount++;
+			if (trafficSummaryCount == routingTable.size()) {
+				System.out.println("All traffic summaries received");
+				trafficSummaryCount = 0;
+				StatisticsCollectorAndDisplay.DisplayStatistics(statistics);
+				statistics.clear();
+			}
+		}
+	}
+
+	/**
+	 * Record the node as finished.
+	 */
+	private void reportNodeTaskFinish(OverlayNodeReportsTaskFinished event) {
+		// Validate IP
+		InetAddress incomingAddr = event.getResponseConnection().getSocketIP();
+		if (!incomingAddr.equals(event.getIP())) {
+			System.err.println("Given IP does not match socket connection");
+			return;
+		}
+		// Verify the node in the routing table
+		RoutingTableEntry entry = routingTable.getEntryByID(event.getID());
+		if (!entry.getIp().equals(entry.getIp()) || entry.getPort() != event.getPort()) {
+			System.err.println("Cannot verify node entry in the registry");
+			return;
+		}
+		// Set the entry as finished
+		if (!entry.isFinished()) {
+			entry.setIsFinished();
+			synchronized (finishedNodes) {
+				finishedNodes++;
+				// If all the nodes in the registry are finished
+				// Send out traffic summary requests
+				if (finishedNodes == routingTable.size()) {
+					finishedNodes = 0;
+					routingTable.resetNodes();
+				// For testing purposes ??
+				try {
+					Thread.sleep(seconds * 1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+					sendTrafficSummaryRequests();
+				}
+			}
+		}
+	}
+
+	/**
+	 * Sends requests for traffic summaries to every node.
+	 */
+	private void sendTrafficSummaryRequests() {
+		// Send a task initiate to all nodes
+		for (Map.Entry<Integer, TCPConnection> entry : server.getActiveConnections().entrySet()) {
+			TCPConnection conn = entry.getValue();
+			RegistryRequestsTrafficSummary tSummary = new RegistryRequestsTrafficSummary();
+			conn.sendMessage(tSummary.getBytes());
+		}
+	}
+
 	/**
 	 * Removes a node from the registry.
 	 * @param event - the registration wireframe event

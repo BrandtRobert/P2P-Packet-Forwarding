@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -19,7 +18,6 @@ import cs455.overlay.wireframes.EventFactory;
  * In order to send a message it is added to the messageQueue.
  * The sender thread picks messages off the queue and sends them over the socket.
  * @author Brandt Reutimann
- *
  */
 public class TCPConnection {
 	private Socket socket;
@@ -33,7 +31,7 @@ public class TCPConnection {
 	public TCPConnection (Socket socket, TCPServerThread master) {
 		this.socket = socket;
 		isRunning = new AtomicBoolean (true);
-		messageQueue = new LinkedBlockingQueue<byte[]>(50);
+		messageQueue = new LinkedBlockingQueue<byte[]>(1000);
 		this.master = master;
 		try {
 			sender = new Thread (new TCPSenderThread(), "Sender-Thread");
@@ -58,6 +56,9 @@ public class TCPConnection {
 	 */
 	public void sendMessage (byte [] message) {
 		try {
+			if (messageQueue.remainingCapacity() == 0) {
+				System.out.println("Message queue capped waiting for space...");
+			}
 			messageQueue.put(message);
 		} catch (InterruptedException e) {
 			System.err.println("Thread interrupted while adding item to the message queue");

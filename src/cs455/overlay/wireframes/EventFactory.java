@@ -23,7 +23,15 @@ public class EventFactory {
 			return new NodeReportsOverlaySetupStatus(msg, incomingConnection);
 		} else if (msgType == Protocol.REGISTRY_REQUESTS_TASK_INITIATE.getValue()) {
 			return new RegistryRequestsTaskInitiate(msg, incomingConnection);
-		} else {
+		} else if (msgType == Protocol.OVERLAY_NODE_SENDS_DATA.getValue()) {
+			return new OverlayNodeSendsData(msg, incomingConnection);
+		} else if (msgType == Protocol.OVERLAY_NODE_REPORTS_TASK_FINISHED.getValue()) {
+			return new OverlayNodeReportsTaskFinished(msg, incomingConnection);
+		} else if (msgType == Protocol.REGISTRY_REQUESTS_TRAFFIC_SUMMARY.getValue()) {
+			return new RegistryRequestsTrafficSummary(msg, incomingConnection);
+		} else if (msgType == Protocol.OVERLAY_NODE_REPORTS_TRAFFIC_SUMMARY.getValue()) {
+			return new OverlayNodeReportsTrafficSummary(msg, incomingConnection);
+		}  else {
 			System.err.println("Unrecognized message type in event factory");
 			return null;
 		}

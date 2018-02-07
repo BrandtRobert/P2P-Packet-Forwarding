@@ -9,6 +9,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import cs455.overlay.routing.RoutingTableEntry;
@@ -75,7 +76,8 @@ public class RegistrySendsNodeManifest implements Event {
 		byte numIDs = din.readByte();
 		this.allNodeIds = new Integer[numIDs];
 		for (byte i = 0; i < numIDs; i++) {
-			this.allNodeIds[i] = din.readInt();
+			int id = din.readInt();
+			this.allNodeIds[i] = id;
 		}
 		baInputStream.close();
 		din.close();
@@ -120,7 +122,7 @@ public class RegistrySendsNodeManifest implements Event {
 				dout.writeInt(currEntry.getPort());
 			}
 			// Write the entire node ID manifest
-			dout.writeInt(allNodeIds.length);
+			dout.writeByte((byte) allNodeIds.length);
 			for (byte i = 0; i < (byte) allNodeIds.length; i++) {
 				dout.writeInt(allNodeIds[i]);
 			}

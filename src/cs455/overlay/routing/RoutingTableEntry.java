@@ -14,10 +14,12 @@ public class RoutingTableEntry {
 	private InetAddress ip; // IP address of this host
 	private int port;		// Port the host is listening on
 	private int id;
+	private boolean isFinished;
 	
 	public RoutingTableEntry (InetAddress ip, int port) {
 		this.ip = ip;
 		this.port = port;
+		isFinished = false;
 	}
 	/**
 	 * @return the ip
@@ -97,6 +99,18 @@ public class RoutingTableEntry {
 	 */
 	public void setId(int id) {
 		this.id = id;
+	}
+	
+	public synchronized boolean isFinished() {
+		return isFinished;
+	}
+	
+	public synchronized void setIsFinished() {
+		isFinished = true;
+	}
+	
+	public synchronized void resetIsFinished() {
+		isFinished = false;
 	}
 	
 }

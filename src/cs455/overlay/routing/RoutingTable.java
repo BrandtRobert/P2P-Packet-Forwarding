@@ -22,6 +22,13 @@ public class RoutingTable {
 		routingtable = new TreeMap<Integer, RoutingTableEntry>();
 	}
 	
+	public RoutingTable (List<RoutingTableEntry> routingTableEntries) {
+		routingtable = new TreeMap<Integer, RoutingTableEntry>();
+		for (RoutingTableEntry re : routingTableEntries) {
+			routingtable.put(re.getId(), re);
+		}
+	}
+	
 	/**
 	 * Adds a new node to the routing table, randomly assigns an id.
 	 * @param ip - ip of the registering node
@@ -133,6 +140,13 @@ public class RoutingTable {
 			// If no such key is possible (there is no node less than the given node id)
 			// 	select the greatest key in the table
 			return routingtable.lastKey();
+		}
+	}
+
+	public void resetNodes() {
+		for (Map.Entry<Integer, RoutingTableEntry> r : routingtable.entrySet()) {
+			RoutingTableEntry entry = r.getValue();
+			entry.resetIsFinished();
 		}
 	}
 }
