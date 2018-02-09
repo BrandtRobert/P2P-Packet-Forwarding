@@ -6,8 +6,10 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Executors;
 
 import cs455.overlay.wireframes.Event;
 import cs455.overlay.wireframes.EventFactory;
@@ -149,9 +151,11 @@ public class TCPConnection {
 	
 	private class TCPReceiverThread implements Runnable {
 		DataInputStream din;
+		ExecutorService threadPool;
 		
 		public TCPReceiverThread() throws IOException {
 			din = new DataInputStream(socket.getInputStream());
+			threadPool = Executors.newFixedThreadPool (100);
 		}
 
 		/**
@@ -167,15 +171,17 @@ public class TCPConnection {
 					din.readFully(data, 0, dataLength);
 					Event event = EventFactory.convertBytesToEvent(data, TCPConnection.this);
 					// Handle the event asynchronously, this syntax requires java 8
-					new Thread(()->{
+					// The thread pool architecture prevents you from thread bombing the system,
+					// 		and eating all the memory.
+					threadPool.submit(()->{
 						master.onEvent(event);
-					}).start();
+					});
 				} catch (SocketException e) {
-					System.err.println("Socket connection closed");
+					System.err.println("Socket connection closed: " + getSocketIP());
 					die();
 					return;
 				} catch (IOException e) {
-					System.err.println("Socket connection closed");
+					System.err.println("Socket connection closed: " + getSocketIP());
 					die();
 					return;
 				}

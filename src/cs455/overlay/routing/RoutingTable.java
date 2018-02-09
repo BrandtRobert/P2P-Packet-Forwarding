@@ -2,6 +2,7 @@ package cs455.overlay.routing;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -112,6 +113,21 @@ public class RoutingTable {
 			nodesRoutingTable.add(routingtable.get(idOfNextEntry));
 		}
 		return nodesRoutingTable;
+	}
+	
+	/** 
+	 * Prints the routing tables for each nodes
+	 * @param size --> size of the routing table
+	 */
+	public void printRoutingTables(int size) {
+		System.out.println("Manifest: " + Arrays.toString(keyManifest()));
+		for (Map.Entry<Integer, RoutingTableEntry> entry : routingtable.entrySet()) {
+			List<RoutingTableEntry> subtable = getSubTable(entry.getKey(), size);
+			System.out.println("Routing Table for Node: " + entry.getKey());
+			for (RoutingTableEntry n : subtable) {
+				System.out.printf("\tNode: %d, IP: %s, Port: %d\n", n.getId(), n.getIp(), n.getPort());
+			}
+		}
 	}
 	
 	/**

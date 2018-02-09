@@ -3,8 +3,10 @@ import java.io.IOException;
 import java.lang.Thread;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Scanner;
 
 import cs455.overlay.routing.RoutingTable;
@@ -58,7 +60,7 @@ public class Registry implements Node {
 				registry.nodeTableSize = (splits.length > 1) ? Integer.parseInt(splits[1]): 3;
 				registry.setupOverlay(false);
 			} else if (splits[0].equals("list-routing-tables")) {
-				registry.setupOverlay(true);
+				registry.listRoutingTables();
 			} else if (splits[0].equals("start")) {
 				if (registry.setupOverlayComplete) {
 					int numPackets = Integer.parseInt(splits[1]);
@@ -66,11 +68,14 @@ public class Registry implements Node {
 				} else {
 					System.err.println("Unable to initiate message sending without overlay setup");
 				}
-				
 			}
 		}
 	}
 	
+	private void listRoutingTables() {
+		routingTable.printRoutingTables(this.nodeTableSize);
+	}
+
 	/**
 	 * Sends task initiate
 	 * @param numPackets

@@ -7,9 +7,11 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import cs455.overlay.routing.RoutingTable;
 import cs455.overlay.routing.RoutingTableEntry;
@@ -36,6 +38,7 @@ public class MessagingNode implements Node {
 	private Integer [] nodeManifest;
 	private RoutingTable routingtable;
 	private StatisticsCollectorAndDisplay statistics;
+	private AtomicBoolean newDataReceived = new AtomicBoolean(false);
 	
 	private static void usage() {
 		System.out.println("java MessagingNode <server> <port>");
@@ -260,7 +263,7 @@ public class MessagingNode implements Node {
 			// Get the route to that node
 			int route = routingtable.getClosestNode(randomNode);
 			// Craft a payload, a random number between int max and int min
-			int payload = rand.nextInt(Integer.MAX_VALUE) * (rand.nextBoolean() ? 1 : -1);
+			int payload = rand.nextInt();
 			// Craft the message to send
 			OverlayNodeSendsData packet = new OverlayNodeSendsData(randomNode, this.registeredId, payload);
 			// Send it
@@ -272,6 +275,13 @@ public class MessagingNode implements Node {
 		}
 		// Report task finished
 		try {
+			// One way to handle the node terminating before it has received all it's messages
+			while (newDataReceived.get()) {
+				newDataReceived.getAndSet(false);
+				// Because we can't use thread.sleep we busy wait
+				long start = new Date().getTime();
+				while(new Date().getTime() - start < 1500L);
+			}
 			InetAddress localhost = InetAddress.getLocalHost();
 			OverlayNodeReportsTaskFinished tFinished = 
 					new OverlayNodeReportsTaskFinished(localhost, server.getPort(), this.registeredId);
@@ -282,6 +292,7 @@ public class MessagingNode implements Node {
 	}
 	
 	private void onNextPacket(OverlayNodeSendsData event) {
+		newDataReceived.getAndSet(true);
 		statistics.incrementPacketsTouched();
 		int destination = event.getDestID();
 		if (destination == this.registeredId) {
