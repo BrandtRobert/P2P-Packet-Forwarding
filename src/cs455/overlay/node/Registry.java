@@ -3,10 +3,8 @@ import java.io.IOException;
 import java.lang.Thread;
 import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Scanner;
 
 import cs455.overlay.routing.RoutingTable;
@@ -38,9 +36,10 @@ public class Registry implements Node {
 	
 	public static void main (String [] args) {
 		Registry registry = new Registry();
-		registry.runServer();
+		int listeningPort = (args.length == 1) ? Integer.parseInt(args[0]) : 0;
+		registry.runServer(listeningPort);
 		// Delay to place before sending out traffic summary requests
-		registry.seconds = (args.length == 1) ? Integer.parseInt(args[0]) : 5;
+		registry.seconds = (args.length == 2) ? Integer.parseInt(args[1]) : 0;
 		// Open reader from the user
 		Scanner sysin = new Scanner (System.in);
 		while (true) {
@@ -326,13 +325,14 @@ public class Registry implements Node {
 	
 	/**
 	 * Starts the server, and keeps it running.
+	 * @param listeningPort 
 	 */
-	private void runServer() {
+	private void runServer(int listeningPort) {
 		try {
-			server = new TCPServerThread(this);
+			server = new TCPServerThread(this, listeningPort);
 		} catch (IOException e) {
-			System.err.println("Failed to start server!");
-			quit();
+			System.err.println("Failed to start server, you may be using a reserved port!");
+			System.exit(1);
 		}
 		serverThread = new Thread (server, "Server-Thread");
 		serverThread.start();

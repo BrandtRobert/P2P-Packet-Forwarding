@@ -30,6 +30,46 @@ public class TCPServerThread implements Runnable {
 		printRunningServer();
 	}
 	
+	public TCPServerThread (Node listeningNode, int portnum) throws IOException {
+		master = listeningNode;
+		activeConnections = new TCPConnectionsCache();
+		tempConnections = new TreeMap<Integer, TCPConnection>();
+		isRunning = new AtomicBoolean(true);
+		// A port of 0, chooses a randomly available port
+		if (portAvailable(portnum)) {
+			serversocket = new ServerSocket(portnum);
+		} else {
+			System.err.println("Port: " + portnum + " is unavailable, choosing a random port");
+			serversocket = new ServerSocket(0);
+		}
+		printRunningServer();
+		
+	}
+	
+	// Returns true if the port is available
+	// Credit: https://www.geekality.net/2013/04/30/java-simple-check-to-see-if-a-server-is-listening-on-a-port/
+	public boolean portAvailable (int port) {
+	    Socket s = null;
+	    try {
+	    	InetAddress localhost = InetAddress.getLocalHost();
+	        s = new Socket(localhost, port);
+	        return false;
+	    } catch (Exception e) {
+	    	// Unable to connect to server
+	        return true;
+	    } finally {
+	    	// Close socket
+	        if(s != null) {
+	            try {
+	            	s.close();
+	            }
+	            catch(Exception e){
+	            	// Do nothing
+	            }
+	        }
+	    }
+	}
+	
 	@Override
 	public void run() {
 		try {
